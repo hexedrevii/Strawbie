@@ -1,12 +1,22 @@
+#include "kernel/kernel.h"
+#include "kernel/modules/vfs.h"
 #include <raylib.h>
 
 int main() {
   InitWindow(800, 600, "Strawbie");
 
+  // Initialise kernel
+  strawbie::Kernel kernel = strawbie::Kernel();
+  kernel.module<strawbie::VirtualFS>();
+
+  // Bootup sequence
+  kernel.boot();
+
   while (!WindowShouldClose()) {
+    kernel.tick();
+
     BeginDrawing();
     ClearBackground(WHITE);
-    DrawText("Hello, World!", 5, 5, 20, BLACK);
     EndDrawing();
   }
 

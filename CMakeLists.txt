@@ -20,6 +20,11 @@ endif()
 
 add_executable(${PROJECT_NAME}
   src/main.cpp
+  src/kernel/kernel.h
+  src/kernel/kernel.cpp
+  src/kernel/modules/vfs.h
+  src/kernel/modules/module.h
+  src/kernel/modules/vfs.cpp
 )
 
 target_include_directories(${PROJECT_NAME} PRIVATE
@@ -35,5 +40,13 @@ add_custom_command(
   COMMAND ${CMAKE_COMMAND} -E copy_directory
     "${CMAKE_CURRENT_SOURCE_DIR}/assets"
     "$<TARGET_FILE_DIR:${PROJECT_NAME}>/assets"
-  COMMENT "Copying assets to output directory..."
+  COMMENT "\nCopying assets to output directory..."
+)
+
+add_custom_command(
+  TARGET ${PROJECT_NAME} POST_BUILD
+  COMMAND ${CMAKE_COMMAND} -E copy_directory
+    "${CMAKE_CURRENT_SOURCE_DIR}/bootstrap/rootfs"
+    "$<TARGET_FILE_DIR:${PROJECT_NAME}>/rootfs"
+  COMMENT "\nCopying root to output directory..."
 )
