@@ -6,8 +6,8 @@ namespace strawbie {
     virtual ~Module() = default;
 
     virtual void init() = 0;
-    virtual void tick() = 0;
 
+    virtual void tick() {}
     virtual void shutdown() {}
   };
 } // namespace strawbie
