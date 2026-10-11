@@ -27,14 +27,17 @@ namespace strawbie {
 
     void boot();
     void tick();
+    void shutdown();
 
     unsigned int process(std::string_view path);
 
   private:
+    void kworker(Process* process, const std::string content);
+
     std::vector<std::unique_ptr<Module>> mModules;
     std::unordered_map<size_t, Module*> mServices;
 
     unsigned int mPid = 1;
-    std::map<unsigned int, Process> mProcesses;
+    std::map<unsigned int, std::unique_ptr<Process>> mProcesses;
   };
 } // namespace strawbie

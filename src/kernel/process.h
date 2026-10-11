@@ -1,7 +1,9 @@
 #pragma once
 
-#include <memory>
+#include <atomic>
+#include <semaphore>
 #include <sol/sol.hpp>
+#include <thread>
 
 namespace strawbie {
   struct Process {
@@ -10,9 +12,10 @@ namespace strawbie {
 
     std::string name;
 
-    std::unique_ptr<sol::state> state;
-    sol::protected_function init;
-    sol::protected_function update;
-    sol::protected_function draw;
+    float delta;
+    uint instructions = 0;
+    std::binary_semaphore frame {0};
+    std::atomic<bool> alive {true};
+    std::jthread thread;
   };
 }

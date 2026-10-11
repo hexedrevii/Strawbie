@@ -14,10 +14,12 @@ int main() {
 
   // test
   kernel.process("/hello.lua");
+  kernel.process("/long.lua");
 
   while (!WindowShouldClose()) {
     kernel.tick();
   }
 
+  kernel.shutdown();
   CloseWindow();
 }
