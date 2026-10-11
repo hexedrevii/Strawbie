@@ -24,7 +24,6 @@ namespace strawbie {
   private:
     // Where root begins in the real filesystem
     const std::string mRoot = "rootfs";
-    const char mSeparator = '/';
 
     std::vector<Mount> mMounts;
   public:
@@ -32,6 +31,8 @@ namespace strawbie {
 
     void mount(std::string_view path, Permissions perms);
     std::optional<Mount> getMount(std::string_view path);
+
+    std::string read(std::string_view path);
 
     std::string normalise(std::string_view path);
     std::string resolve(std::string_view path);

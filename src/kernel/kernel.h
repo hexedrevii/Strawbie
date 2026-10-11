@@ -1,7 +1,9 @@
 #pragma once
 
 #include "kernel/modules/module.h"
+#include "kernel/process.h"
 #include <cstddef>
+#include <map>
 #include <memory>
 #include <unordered_map>
 #include <utility>
@@ -26,8 +28,13 @@ namespace strawbie {
     void boot();
     void tick();
 
+    unsigned int process(std::string_view path);
+
   private:
     std::vector<std::unique_ptr<Module>> mModules;
     std::unordered_map<size_t, Module*> mServices;
+
+    unsigned int mPid = 1;
+    std::map<unsigned int, Process> mProcesses;
   };
 } // namespace strawbie

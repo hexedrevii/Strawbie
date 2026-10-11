@@ -57,6 +57,8 @@ add_executable(${PROJECT_NAME}
   src/kernel/modules/vfs.h
   src/kernel/modules/module.h
   src/kernel/modules/vfs.cpp
+  src/kernel/process.h
+  src/exceptions.h
 )
 
 target_include_directories(${PROJECT_NAME} PRIVATE

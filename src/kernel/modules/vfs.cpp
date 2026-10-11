@@ -1,5 +1,8 @@
 #include "kernel/modules/vfs.h"
+#include "exceptions.h"
 #include <cstddef>
+#include <filesystem>
+#include <fstream>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -24,7 +27,7 @@ std::optional<strawbie::Mount> strawbie::VirtualFS::getMount(std::string_view pa
 
   for (strawbie::Mount& mount : this->mMounts) {
     const std::string& name = mount.path;
-    if (clean == name || clean.starts_with(name + "/")) {
+    if (name == "/" || clean == name || clean.starts_with(name + "/")) {
       if (name.size() > len) {
         len = name.size();
         best = mount;
@@ -35,12 +38,47 @@ std::optional<strawbie::Mount> strawbie::VirtualFS::getMount(std::string_view pa
   return best;
 }
 
+std::string strawbie::VirtualFS::read(std::string_view path) {
+  std::optional<strawbie::Mount> mount = this->getMount(path);
+  if (mount == std::nullopt) {
+    throw strawbie::NotMountedException("Directory not mounted.");
+  }
+
+  std::string clean = this->normalise(path);
+  if (!(mount->permissions & Permissions::READ)) {
+    throw strawbie::NoPermissionException("Permission denied: " + clean);
+  }
+
+  std::string physical = this->resolve(clean);
+
+  if (!std::filesystem::exists(physical)) {
+    throw strawbie::FileException("No such file.");
+  }
+
+  if (std::filesystem::is_directory(physical)) {
+    throw strawbie::FileException("Is a directory.");
+  }
+
+  std::ifstream file(physical);
+  if (!file) {
+    throw strawbie::FileException("Could not open " + clean);
+  }
+
+  const auto size = std::filesystem::file_size(physical);
+  std::string content = std::string(size, '\0');
+
+  file.read(content.data(), size);
+  file.close();
+
+  return content;
+}
+
 std::string strawbie::VirtualFS::normalise(std::string_view path) {
   std::vector<std::string_view> stack;
 
-  size_t start = path.find_first_not_of(this->mSeparator);
+  size_t start = path.find_first_not_of('/');
   while (start != std::string_view::npos) {
-    size_t end = path.find_first_of(this->mSeparator, start);
+    size_t end = path.find_first_of('/', start);
 
     std::string_view part = path.substr(start, end - start);
 
@@ -53,14 +91,14 @@ std::string strawbie::VirtualFS::normalise(std::string_view path) {
       stack.push_back(part);
     }
 
-    start = path.find_first_not_of(this->mSeparator, end);
+    start = path.find_first_not_of('/', end);
   }
 
-  if (stack.empty()) return std::string(1, this->mSeparator);
+  if (stack.empty()) return std::string(1, '/');
 
   std::string joined;
   for (std::string_view part : stack) {
-    joined += this->mSeparator;
+    joined += '/';
     joined += part;
   }
 
@@ -70,10 +108,6 @@ std::string strawbie::VirtualFS::normalise(std::string_view path) {
 std::string strawbie::VirtualFS::resolve(std::string_view path) {
   std::string normalised = this->normalise(path);
 
-  // This sorta means nothing
-  // mSeparator is forced to be / anyway due to limitations of the real OS.
-  // but whatever it looks cool
-  std::replace(normalised.begin(), normalised.end(), this->mSeparator, '/');
   if (!normalised.empty() && normalised.front() == '/') {
     normalised.erase(0, 1);
   }
