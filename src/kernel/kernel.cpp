@@ -10,10 +10,15 @@
 #include "raylib.h"
 
 #include <algorithm>
+#include <cstdint>
+#include <map>
 #include <memory>
 #include <mutex>
+#include <sol/object.hpp>
 #include <sol/sol.hpp>
+#include <sol/types.hpp>
 #include <thread>
+#include <variant>
 #include <vector>
 
 namespace {
@@ -41,7 +46,56 @@ namespace {
   const int RESOLUTION_WIDTH = 420;
   const int RESOLUTION_HEIGHT = 270;
 
+  const int MAX_PAYLOADS = 255;
+
+  strawbie::IPCValue serialise(sol::object obj) {
+    sol::type type = obj.get_type();
+
+    if (type == sol::type::boolean) {
+      return { obj.as<bool>() };
+    } else if (type == sol::type::string) {
+      return { obj.as<std::string>() };
+    } else if (type == sol::type::number) {
+      obj.push();
+      bool isInteger = lua_isinteger(obj.lua_state(), -1);
+      obj.pop();
+
+      if (isInteger) {
+        return { obj.as<int64_t>() };
+      } else {
+        return { obj.as<double>() };
+      }
+    } else if (type == sol::type::table) {
+      std::map<strawbie::IPCKey, strawbie::IPCValue> map;
+      sol::table table = obj.as<sol::table>();
+
+      for (auto& [key, value] : table) {
+        if (key.get_type() == sol::type::string) {
+          map[key.as<std::string>()] = serialise(value);
+        } else if (key.get_type() == sol::type::number) {
+          key.push();
+          bool isInteger = lua_isinteger(obj.lua_state(), -1);
+          key.pop();
+
+          if (isInteger) {
+            map[key.as<int64_t>()] = serialise(value);
+          } else {
+            map[key.as<double>()] = serialise(value);
+          }
+        }
+      }
+
+      return { map };
+    }
+
+    return { std::monostate{} };
+  }
+
   Texture2D resolution;
+}
+
+unsigned int strawbie::Kernel::getWMPID() const {
+  return this->mWindowManager;
 }
 
 void strawbie::Kernel::boot() {
@@ -60,6 +114,9 @@ void strawbie::Kernel::boot() {
   strawbie::Process& wm = *this->mProcesses.at(this->mWindowManager);
   wm.video.vram.assign(RESOLUTION_WIDTH * RESOLUTION_HEIGHT, (Color){0,0,0,255});
   wm.video.buffer.assign(RESOLUTION_WIDTH * RESOLUTION_HEIGHT, (Color){0,0,0,255});
+
+  this->process("/dev/ipc/reciever.lua");
+  this->process("/dev/ipc/sender.lua");
 }
 
 void strawbie::Kernel::tick() {
@@ -125,6 +182,8 @@ void strawbie::Kernel::shutdown() {
   }
 
   this->mProcesses.clear();
+
+  UnloadTexture(resolution);
 }
 
 void strawbie::Kernel::kworker(strawbie::Process* process, const std::string content) {
@@ -133,7 +192,6 @@ void strawbie::Kernel::kworker(strawbie::Process* process, const std::string con
 
   lua_pushlightuserdata(lua.lua_state(), process);
   lua_setfield(lua.lua_state(), LUA_REGISTRYINDEX, "__strawbie_proc");
-
   lua_sethook(lua.lua_state(), watchHook, LUA_MASKCOUNT, CPU_INSTRUCTION_TIME);
 
   std::string name = "@" + process->name;
@@ -218,6 +276,8 @@ unsigned int strawbie::Kernel::process(std::string_view path, strawbie::Priviled
   proc->pid = pid;
   proc->name = clean;
 
+  proc->priviledges = priviledges;
+
   Process* procPtr = proc.get();
   this->mProcesses.emplace(pid, std::move(proc));
 
@@ -225,3 +285,55 @@ unsigned int strawbie::Kernel::process(std::string_view path, strawbie::Priviled
 
   return pid;
 }
+
+void strawbie::Kernel::send(unsigned int process, std::string name, sol::object payload, unsigned int sender) {
+  if (!this->mProcesses.contains(process)) {
+    // TODO: Maybe throw?
+    return;
+  }
+
+  Process& proc = *this->mProcesses.at(process);
+
+  std::lock_guard<std::mutex> lock(proc.ipcLock);
+
+  if (proc.ipc.size() > MAX_PAYLOADS) {
+    return;
+  }
+
+  IPCValue ipc = serialise(payload);
+  Message msg = (Message){ .sender = sender, .name = name, .payload = ipc };
+
+  proc.ipc.push_back(msg);
+}
+
+sol::object strawbie::Kernel::deserialise(sol::state_view lua, strawbie::IPCValue& val) {
+    if (std::holds_alternative<bool>(val.data)) {
+      return sol::make_object(lua, std::get<bool>(val.data));
+    } else if (std::holds_alternative<std::string>(val.data)) {
+      return sol::make_object(lua, std::get<std::string>(val.data));
+    } else if (std::holds_alternative<double>(val.data)) {
+      return sol::make_object(lua, std::get<double>(val.data));
+    } else if (std::holds_alternative<int64_t>(val.data)) {
+      return sol::make_object(lua, std::get<int64_t>(val.data));
+    } else if (std::holds_alternative<std::map<strawbie::IPCKey, strawbie::IPCValue>>(val.data)) {
+      sol::table table = lua.create_table();
+      auto& map = std::get<std::map<strawbie::IPCKey, strawbie::IPCValue>>(val.data);
+
+      for (auto& [key, value] : map) {
+        sol::object lkey;
+        if (std::holds_alternative<std::string>(key)) {
+          lkey = sol::make_object(lua, std::get<std::string>(key));
+        } else if (std::holds_alternative<double>(key)) {
+          lkey = sol::make_object(lua, std::get<double>(key));
+        } else if (std::holds_alternative<int64_t>(key)) {
+          lkey = sol::make_object(lua, std::get<int64_t>(key));
+        }
+
+        table[lkey] = deserialise(lua, value);
+      }
+
+      return table;
+    }
+
+    return sol::lua_nil;
+  }

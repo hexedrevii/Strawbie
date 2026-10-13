@@ -1,5 +1,6 @@
 #pragma once
 
+#include "api/system.hpp"
 #include "kernel/kernel.hpp"
 #include "kernel/process.hpp"
 #include "api/graphics.hpp"
@@ -18,5 +19,6 @@ namespace strawbie {
     lua["require"] = sol::lua_nil;
 
     mkgraphics(lua, kernel, proc);
+    mksystem(lua, kernel, proc);
   }
 }

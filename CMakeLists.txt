@@ -61,6 +61,7 @@ add_executable(${PROJECT_NAME}
   src/exceptions.hpp
   src/api/env.hpp
   src/api/graphics.hpp
+  src/api/system.hpp
 )
 
 target_include_directories(${PROJECT_NAME} PRIVATE
