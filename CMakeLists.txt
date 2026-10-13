@@ -52,13 +52,15 @@ FetchContent_MakeAvailable(sol2)
 
 add_executable(${PROJECT_NAME}
   src/main.cpp
-  src/kernel/kernel.h
+  src/kernel/kernel.hpp
   src/kernel/kernel.cpp
-  src/kernel/modules/vfs.h
-  src/kernel/modules/module.h
+  src/kernel/modules/vfs.hpp
+  src/kernel/modules/module.hpp
   src/kernel/modules/vfs.cpp
-  src/kernel/process.h
-  src/exceptions.h
+  src/kernel/process.hpp
+  src/exceptions.hpp
+  src/api/env.hpp
+  src/api/graphics.hpp
 )
 
 target_include_directories(${PROJECT_NAME} PRIVATE

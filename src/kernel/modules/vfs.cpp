@@ -1,5 +1,5 @@
-#include "kernel/modules/vfs.h"
-#include "exceptions.h"
+#include "kernel/modules/vfs.hpp"
+#include "exceptions.hpp"
 #include <cstddef>
 #include <filesystem>
 #include <fstream>

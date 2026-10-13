@@ -1,4 +1,6 @@
-#include "kernel/modules/module.h"
+#pragma once
+
+#include "kernel/modules/module.hpp"
 #include <optional>
 #include <string>
 #include <string_view>

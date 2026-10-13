@@ -1,8 +1,9 @@
-#include "kernel/kernel.h"
-#include "kernel/modules/vfs.h"
+#include "kernel/kernel.hpp"
+#include "kernel/modules/vfs.hpp"
 #include <raylib.h>
 
 int main() {
+  SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_VSYNC_HINT);
   InitWindow(800, 600, "Strawbie");
 
   // Initialise kernel
@@ -11,10 +12,6 @@ int main() {
 
   // Bootup sequence
   kernel.boot();
-
-  // test
-  kernel.process("/hello.lua");
-  kernel.process("/long.lua");
 
   while (!WindowShouldClose()) {
     kernel.tick();
