@@ -10,6 +10,7 @@
 #include "raylib.h"
 
 #include <algorithm>
+#include <chrono>
 #include <cstdint>
 #include <map>
 #include <memory>
@@ -94,11 +95,28 @@ namespace {
   Texture2D resolution;
 }
 
-void strawbie::Kernel::registerProcess(std::string name, unsigned int pid) {
+void strawbie::Kernel::addRegistry(std::string name, unsigned int pid) {
+  std::lock_guard<std::mutex> lock(this->mRegistryLock);
   this->mRegistry.emplace(name, pid);
+
+  this->mRegistryWait.notify_all();
 }
 
-unsigned int strawbie::Kernel::findProcess(std::string name) {
+unsigned int strawbie::Kernel::waitForRegistry(std::string name) {
+  std::unique_lock<std::mutex> lock(this->mRegistryLock);
+
+  bool found = this->mRegistryWait.wait_for(lock, std::chrono::seconds(5), [this, &name] {
+    return this->mRegistry.contains(name);
+  });
+
+  if (!found) return 0;
+
+  return this->mRegistry.at(name);
+}
+
+unsigned int strawbie::Kernel::findRegistry(std::string name) {
+  std::lock_guard<std::mutex> lock(this->mRegistryLock);
+
   if (!this->mRegistry.contains(name)) return 0;
   return this->mRegistry.at(name);
 }
@@ -144,7 +162,7 @@ void strawbie::Kernel::draw() {
   );
 
   BeginDrawing();
-    unsigned int wmpid = this->findProcess("display");
+    unsigned int wmpid = this->findRegistry("display");
     if (wmpid != 0) {
       if (this->mProcesses.contains(wmpid)) {
         Process& wm = *this->mProcesses.at(wmpid);

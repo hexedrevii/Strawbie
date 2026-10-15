@@ -26,8 +26,12 @@ namespace strawbie {
       proc->video.vram   = GenImageColor(w, h, BLACK);
       proc->video.buffer = GenImageColor(w, h, BLACK);
 
-      unsigned int wm = kernel->findProcess("display");
-      if (wm != 0 && proc->pid != wm) kernel->send(wm, "WM_CREATE", payload, proc->pid);
+      unsigned int wm = kernel->waitForRegistry("display");
+      if (wm == 0) {
+        throw sol::error("Failed to create window: WM isn't launched or timed out.");
+      }
+
+      if (proc->pid != wm) kernel->send(wm, "WM_CREATE", payload, proc->pid);
     };
 
     graphics["clear"] = [proc](int r, int g, int b) {

@@ -39,7 +39,7 @@ namespace strawbie {
 
     if (proc->priviledges & Priviledges::MASTER) {
       system["register"] = [kernel, proc](std::string name) {
-        kernel->registerProcess(name, proc->pid);
+        kernel->addRegistry(name, proc->pid);
       };
     }
   }
