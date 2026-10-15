@@ -27,12 +27,14 @@ namespace strawbie {
 
     void boot();
     void tick();
+    void draw();
     void shutdown();
 
     sol::object deserialise(sol::state_view lua, IPCValue& value);
     void send(unsigned int process, std::string name, sol::object payload, unsigned int sender);
 
     unsigned int process(std::string_view path, Priviledges priviledges = Priviledges::NONE);
+    Process* getProcess(unsigned int pid);
 
     unsigned int getWMPID() const;
   private:

@@ -112,11 +112,10 @@ void strawbie::Kernel::boot() {
 
   this->mWindowManager = this->process("/sys/wm.lua", Priviledges::MASTER);
   strawbie::Process& wm = *this->mProcesses.at(this->mWindowManager);
-  wm.video.vram.assign(RESOLUTION_WIDTH * RESOLUTION_HEIGHT, (Color){0,0,0,255});
-  wm.video.buffer.assign(RESOLUTION_WIDTH * RESOLUTION_HEIGHT, (Color){0,0,0,255});
+  wm.video.vram = GenImageColor(RESOLUTION_WIDTH, RESOLUTION_HEIGHT, (Color){0,0,0,255});
+  wm.video.buffer = GenImageColor(RESOLUTION_WIDTH, RESOLUTION_HEIGHT, (Color){0,0,0,255});
 
-  this->process("/dev/ipc/reciever.lua");
-  this->process("/dev/ipc/sender.lua");
+  this->process("/dev/long.lua");
 }
 
 void strawbie::Kernel::tick() {
@@ -135,24 +134,21 @@ void strawbie::Kernel::tick() {
       ++it;
     }
   }
+}
 
-  // Update the screen based on what WM wants
-  Process& wm = *this->mProcesses.at(this->mWindowManager);
-
-  std::lock_guard<std::mutex> lock(wm.video.lock);
-  if (wm.video.buffer.size() == RESOLUTION_WIDTH * RESOLUTION_HEIGHT) {
-    UpdateTexture(resolution, wm.video.buffer.data());
-  }
-
+void strawbie::Kernel::draw() {
   float scale = std::min(
     GetScreenWidth() / RESOLUTION_WIDTH,
     GetScreenHeight() / RESOLUTION_HEIGHT
   );
 
-  // TODO: Mouse
-
-  // Draw the desktop
   BeginDrawing();
+    if (this->mProcesses.contains(this->mWindowManager)) {
+      Process& wm = *this->mProcesses.at(this->mWindowManager);
+      std::lock_guard<std::mutex> lock(wm.video.lock);
+      UpdateTexture(resolution, wm.video.buffer.data);
+    }
+
     ClearBackground(BLACK);
     DrawTexturePro(
       resolution,
@@ -170,8 +166,6 @@ void strawbie::Kernel::tick() {
       (Vector2) {0,0},
       0, WHITE
     );
-
-    DrawFPS(5, 5);
   EndDrawing();
 }
 
@@ -256,9 +250,12 @@ void strawbie::Kernel::kworker(strawbie::Process* process, const std::string con
 
         break;
       }
+    }
 
+    if (process->video.vram.data != nullptr) {
       std::lock_guard<std::mutex> lock(process->video.lock);
-      process->video.buffer = process->video.vram;
+      int bytes = process->video.vram.width * process->video.vram.height * 4;
+      memcpy(process->video.buffer.data, process->video.vram.data, bytes);
     }
   }
 }
@@ -286,6 +283,14 @@ unsigned int strawbie::Kernel::process(std::string_view path, strawbie::Priviled
   return pid;
 }
 
+strawbie::Process* strawbie::Kernel::getProcess(unsigned int pid) {
+  if (!this->mProcesses.contains(pid)) {
+    return nullptr;
+  }
+
+  return this->mProcesses.at(pid).get();
+}
+
 void strawbie::Kernel::send(unsigned int process, std::string name, sol::object payload, unsigned int sender) {
   if (!this->mProcesses.contains(process)) {
     // TODO: Maybe throw?
@@ -307,33 +312,33 @@ void strawbie::Kernel::send(unsigned int process, std::string name, sol::object 
 }
 
 sol::object strawbie::Kernel::deserialise(sol::state_view lua, strawbie::IPCValue& val) {
-    if (std::holds_alternative<bool>(val.data)) {
-      return sol::make_object(lua, std::get<bool>(val.data));
-    } else if (std::holds_alternative<std::string>(val.data)) {
-      return sol::make_object(lua, std::get<std::string>(val.data));
-    } else if (std::holds_alternative<double>(val.data)) {
-      return sol::make_object(lua, std::get<double>(val.data));
-    } else if (std::holds_alternative<int64_t>(val.data)) {
-      return sol::make_object(lua, std::get<int64_t>(val.data));
-    } else if (std::holds_alternative<std::map<strawbie::IPCKey, strawbie::IPCValue>>(val.data)) {
-      sol::table table = lua.create_table();
-      auto& map = std::get<std::map<strawbie::IPCKey, strawbie::IPCValue>>(val.data);
+  if (std::holds_alternative<bool>(val.data)) {
+    return sol::make_object(lua, std::get<bool>(val.data));
+  } else if (std::holds_alternative<std::string>(val.data)) {
+    return sol::make_object(lua, std::get<std::string>(val.data));
+  } else if (std::holds_alternative<double>(val.data)) {
+    return sol::make_object(lua, std::get<double>(val.data));
+  } else if (std::holds_alternative<int64_t>(val.data)) {
+    return sol::make_object(lua, std::get<int64_t>(val.data));
+  } else if (std::holds_alternative<std::map<strawbie::IPCKey, strawbie::IPCValue>>(val.data)) {
+    sol::table table = lua.create_table();
+    auto& map = std::get<std::map<strawbie::IPCKey, strawbie::IPCValue>>(val.data);
 
-      for (auto& [key, value] : map) {
-        sol::object lkey;
-        if (std::holds_alternative<std::string>(key)) {
-          lkey = sol::make_object(lua, std::get<std::string>(key));
-        } else if (std::holds_alternative<double>(key)) {
-          lkey = sol::make_object(lua, std::get<double>(key));
-        } else if (std::holds_alternative<int64_t>(key)) {
-          lkey = sol::make_object(lua, std::get<int64_t>(key));
-        }
-
-        table[lkey] = deserialise(lua, value);
+    for (auto& [key, value] : map) {
+      sol::object lkey;
+      if (std::holds_alternative<std::string>(key)) {
+        lkey = sol::make_object(lua, std::get<std::string>(key));
+      } else if (std::holds_alternative<double>(key)) {
+        lkey = sol::make_object(lua, std::get<double>(key));
+      } else if (std::holds_alternative<int64_t>(key)) {
+        lkey = sol::make_object(lua, std::get<int64_t>(key));
       }
 
-      return table;
+      table[lkey] = deserialise(lua, value);
     }
 
-    return sol::lua_nil;
+    return table;
   }
+
+  return sol::lua_nil;
+}

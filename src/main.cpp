@@ -4,12 +4,11 @@
 
 int main() {
   SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_VSYNC_HINT);
-  InitWindow(800, 600, "Strawbie");
+  InitWindow(420*2, 270*2, "Strawbie");
 
   SetTargetFPS(60);
 
   SetWindowMinSize(420, 270);
-  SetWindowSize(420 * 2, 270 * 2);
 
   // Initialise kernel
   strawbie::Kernel kernel = strawbie::Kernel();
@@ -20,6 +19,7 @@ int main() {
 
   while (!WindowShouldClose()) {
     kernel.tick();
+    kernel.draw();
   }
 
   kernel.shutdown();

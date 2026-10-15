@@ -11,6 +11,7 @@
 
 void strawbie::VirtualFS::init() {
   this->mount("/", Permissions::READ | Permissions::WRITE | Permissions::EXEC);
+  this->mount("/sys", Permissions::READ | Permissions::EXEC);
 }
 
 void strawbie::VirtualFS::mount(std::string_view path, strawbie::Permissions perms) {

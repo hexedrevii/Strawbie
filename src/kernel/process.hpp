@@ -51,8 +51,10 @@ namespace strawbie {
     std::jthread thread;
 
     struct Video {
-      std::vector<Color> vram;
-      std::vector<Color> buffer;
+      bool windowMode = false;
+
+      Image vram;
+      Image buffer;
 
       std::mutex lock;
     } video;
