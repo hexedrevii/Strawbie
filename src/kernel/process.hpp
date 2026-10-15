@@ -17,6 +17,10 @@ namespace strawbie {
     MASTER = 1 << 0
   };
 
+  inline Priviledges operator|(Priviledges a, Priviledges b) {
+    return static_cast<Priviledges>(static_cast<uint8_t>(a) | static_cast<uint8_t>(b));
+  }
+
   struct IPCValue;
 
   using IPCKey = std::variant<double, int64_t, std::string>;

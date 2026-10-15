@@ -5,6 +5,7 @@
 
 #include <mutex>
 #include <sol/sol.hpp>
+#include <sol/types.hpp>
 
 namespace strawbie {
   inline void mksystem(sol::state& lua, strawbie::Kernel* kernel, strawbie::Process* proc) {
@@ -14,7 +15,9 @@ namespace strawbie {
       kernel->send(pid, name, data, proc->pid);
     };
 
-    system["poll"] = [&lua, kernel, proc]() {
+    system["poll"] = [kernel, proc](sol::this_state s) {
+      sol::state_view lua(s);
+
       sol::table result = lua.create_table();
 
       std::lock_guard<std::mutex> lock(proc->ipcLock);
@@ -33,5 +36,11 @@ namespace strawbie {
       proc->ipc.clear();
       return result;
     };
+
+    if (proc->priviledges & Priviledges::MASTER) {
+      system["register"] = [kernel, proc](std::string name) {
+        kernel->registerProcess(name, proc->pid);
+      };
+    }
   }
 }

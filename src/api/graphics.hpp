@@ -14,6 +14,7 @@ namespace strawbie {
 
     graphics["window"] = [kernel, proc](int w, int h, std::string title, sol::this_state s) {
       if (proc->video.windowMode) return;
+      proc->video.windowMode = true;
 
       sol::state_view lua(s);
 
@@ -25,9 +26,8 @@ namespace strawbie {
       proc->video.vram   = GenImageColor(w, h, BLACK);
       proc->video.buffer = GenImageColor(w, h, BLACK);
 
-      kernel->send(kernel->getWMPID(), "WM_CREATE", payload, proc->pid);
-
-      proc->video.windowMode = true;
+      unsigned int wm = kernel->findProcess("display");
+      if (wm != 0 && proc->pid != wm) kernel->send(wm, "WM_CREATE", payload, proc->pid);
     };
 
     graphics["clear"] = [proc](int r, int g, int b) {

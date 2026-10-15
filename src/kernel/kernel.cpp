@@ -94,8 +94,13 @@ namespace {
   Texture2D resolution;
 }
 
-unsigned int strawbie::Kernel::getWMPID() const {
-  return this->mWindowManager;
+void strawbie::Kernel::registerProcess(std::string name, unsigned int pid) {
+  this->mRegistry.emplace(name, pid);
+}
+
+unsigned int strawbie::Kernel::findProcess(std::string name) {
+  if (!this->mRegistry.contains(name)) return 0;
+  return this->mRegistry.at(name);
 }
 
 void strawbie::Kernel::boot() {
@@ -110,11 +115,7 @@ void strawbie::Kernel::boot() {
 
   UnloadImage(black);
 
-  this->mWindowManager = this->process("/sys/wm.lua", Priviledges::MASTER);
-  strawbie::Process& wm = *this->mProcesses.at(this->mWindowManager);
-  wm.video.vram = GenImageColor(RESOLUTION_WIDTH, RESOLUTION_HEIGHT, (Color){0,0,0,255});
-  wm.video.buffer = GenImageColor(RESOLUTION_WIDTH, RESOLUTION_HEIGHT, (Color){0,0,0,255});
-
+  this->process("/sys/wm.lua");
   this->process("/dev/long.lua");
 }
 
@@ -143,10 +144,14 @@ void strawbie::Kernel::draw() {
   );
 
   BeginDrawing();
-    if (this->mProcesses.contains(this->mWindowManager)) {
-      Process& wm = *this->mProcesses.at(this->mWindowManager);
-      std::lock_guard<std::mutex> lock(wm.video.lock);
-      UpdateTexture(resolution, wm.video.buffer.data);
+    unsigned int wmpid = this->findProcess("display");
+    if (wmpid != 0) {
+      if (this->mProcesses.contains(wmpid)) {
+        Process& wm = *this->mProcesses.at(wmpid);
+        std::lock_guard<std::mutex> lock(wm.video.lock);
+        if (wm.video.buffer.data != nullptr)
+          UpdateTexture(resolution, wm.video.buffer.data);
+      }
     }
 
     ClearBackground(BLACK);
@@ -265,6 +270,11 @@ unsigned int strawbie::Kernel::process(std::string_view path, strawbie::Priviled
 
   std::string clean = vfs->normalise(path);
   std::string content = vfs->read(clean);
+
+  // This MIIIGHT be a hack but... WHATEVER DUDE!
+  if (clean.starts_with("/sys/")) {
+    priviledges = priviledges | Priviledges::MASTER;
+  }
 
   unsigned int pid = this->mPid++;
 

@@ -36,14 +36,15 @@ namespace strawbie {
     unsigned int process(std::string_view path, Priviledges priviledges = Priviledges::NONE);
     Process* getProcess(unsigned int pid);
 
-    unsigned int getWMPID() const;
+    void registerProcess(std::string name, unsigned int pid);
+    unsigned int findProcess(std::string name);
   private:
     void kworker(Process* process, const std::string content);
 
     std::vector<std::unique_ptr<Module>> mModules;
     std::unordered_map<size_t, Module*> mServices;
 
-    unsigned int mWindowManager;
+    std::unordered_map<std::string, unsigned int> mRegistry;
 
     unsigned int mPid = 1;
     std::map<unsigned int, std::unique_ptr<Process>> mProcesses;
