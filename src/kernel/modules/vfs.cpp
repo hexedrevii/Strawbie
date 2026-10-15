@@ -39,6 +39,26 @@ std::optional<strawbie::Mount> strawbie::VirtualFS::getMount(std::string_view pa
   return best;
 }
 
+bool strawbie::VirtualFS::exists(std::string_view path) {
+  std::optional<strawbie::Mount> mount = this->getMount(path);
+  if (mount == std::nullopt) {
+    throw strawbie::NotMountedException("Directory not mounted.");
+  }
+
+  std::string clean = this->resolve(path);
+  return std::filesystem::exists(clean);
+}
+
+bool strawbie::VirtualFS::isDirectory(std::string_view path) {
+  std::optional<strawbie::Mount> mount = this->getMount(path);
+  if (mount == std::nullopt) {
+    throw strawbie::NotMountedException("Directory not mounted.");
+  }
+
+  std::string clean = this->resolve(path);
+  return std::filesystem::is_directory(clean);
+}
+
 std::string strawbie::VirtualFS::read(std::string_view path) {
   std::optional<strawbie::Mount> mount = this->getMount(path);
   if (mount == std::nullopt) {

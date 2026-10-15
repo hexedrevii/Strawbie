@@ -7,6 +7,7 @@
 #include <map>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -35,8 +36,10 @@ namespace strawbie {
     sol::object deserialise(sol::state_view lua, IPCValue& value);
     void send(unsigned int process, std::string name, sol::object payload, unsigned int sender);
 
-    unsigned int process(std::string_view path, Priviledges priviledges = Priviledges::NONE);
+    unsigned int process(std::string_view path, std::optional<std::string_view> cwd = std::nullopt, Priviledges priviledges = Priviledges::NONE);
     Process* getProcess(unsigned int pid);
+    std::string getCWD(unsigned int pid);
+    void setCWD(unsigned int pid, std::string_view path);
 
     void addRegistry(std::string name, unsigned int pid);
     unsigned int findRegistry(std::string name);

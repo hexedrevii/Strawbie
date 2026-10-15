@@ -47,6 +47,7 @@ namespace strawbie {
     unsigned int parent = 0;
 
     std::string name;
+    std::string cwd;
 
     float delta;
     uint instructions = 0;

@@ -34,6 +34,9 @@ namespace strawbie {
     void mount(std::string_view path, Permissions perms);
     std::optional<Mount> getMount(std::string_view path);
 
+    bool exists(std::string_view path);
+    bool isDirectory(std::string_view path);
+
     std::string read(std::string_view path);
 
     std::string normalise(std::string_view path);

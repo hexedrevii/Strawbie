@@ -15,9 +15,12 @@
 #include <map>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <sol/object.hpp>
 #include <sol/sol.hpp>
 #include <sol/types.hpp>
+#include <stdexcept>
+#include <string_view>
 #include <thread>
 #include <variant>
 #include <vector>
@@ -121,6 +124,35 @@ unsigned int strawbie::Kernel::findRegistry(std::string name) {
   return this->mRegistry.at(name);
 }
 
+std::string strawbie::Kernel::getCWD(unsigned int pid) {
+  Process *proc = this->getProcess(pid);
+  if (proc == nullptr) {
+    throw std::runtime_error("Process does not exist.");
+  }
+
+  return proc->cwd;
+}
+
+void strawbie::Kernel::setCWD(unsigned int pid, std::string_view path) {
+  Process *proc = this->getProcess(pid);
+  if (proc == nullptr) {
+    throw std::runtime_error("Process does not exist.");
+  }
+
+  VirtualFS *vfs = this->get<VirtualFS>();
+  std::string clean = vfs->normalise(path);
+
+  if (!vfs->exists(clean)) {
+    throw std::runtime_error("Path does not exist.");
+  }
+
+  if (!vfs->isDirectory(clean)) {
+    throw std::runtime_error("Path is a file, not a directory.");
+  }
+
+  proc->cwd = clean;
+}
+
 void strawbie::Kernel::boot() {
   for (std::unique_ptr<Module>& module : mModules) {
     module->init();
@@ -133,8 +165,9 @@ void strawbie::Kernel::boot() {
 
   UnloadImage(black);
 
-  this->process("/sys/wm.lua");
-  this->process("/dev/long.lua");
+  this->process("/sys/boot.lua");
+
+  this->process("/dev/hello.lua");
 }
 
 void strawbie::Kernel::tick() {
@@ -283,13 +316,12 @@ void strawbie::Kernel::kworker(strawbie::Process* process, const std::string con
   }
 }
 
-unsigned int strawbie::Kernel::process(std::string_view path, strawbie::Priviledges priviledges) {
+unsigned int strawbie::Kernel::process(std::string_view path, std::optional<std::string_view> cwd, strawbie::Priviledges priviledges) {
   strawbie::VirtualFS* vfs = this->get<strawbie::VirtualFS>();
 
   std::string clean = vfs->normalise(path);
   std::string content = vfs->read(clean);
 
-  // This MIIIGHT be a hack but... WHATEVER DUDE!
   if (clean.starts_with("/sys/")) {
     priviledges = priviledges | Priviledges::MASTER;
   }
@@ -302,6 +334,12 @@ unsigned int strawbie::Kernel::process(std::string_view path, strawbie::Priviled
   proc->name = clean;
 
   proc->priviledges = priviledges;
+
+  if (!cwd.has_value()) {
+    proc->cwd = GetDirectoryPath(std::string(path).c_str());
+  } else {
+    proc->cwd = cwd.value();
+  }
 
   Process* procPtr = proc.get();
   this->mProcesses.emplace(pid, std::move(proc));
